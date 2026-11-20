@@ -7,6 +7,7 @@ Writes the pre-built 1024x1024 image (entry.png, in this repository) to
 no randomness, no timestamps, no environment dependence.
 """
 
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -15,10 +16,26 @@ SRC = HERE / "entry.png"
 DST = Path("/output/entry.png")
 
 
+def _sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main():
+    if not SRC.is_file():
+        raise SystemExit("error: entry image not found: {}".format(SRC))
     DST.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(SRC, DST)
-    print("wrote {} ({} bytes)".format(DST, DST.stat().st_size))
+    src_size = SRC.stat().st_size
+    dst_size = DST.stat().st_size
+    if dst_size != src_size or _sha256(DST) != _sha256(SRC):
+        raise SystemExit(
+            "error: copied image does not match source: {} != {}".format(DST, SRC)
+        )
+    print("wrote {} ({} bytes, verified)".format(DST, dst_size))
 
 
 if __name__ == "__main__":
